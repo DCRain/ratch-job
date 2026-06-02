@@ -54,6 +54,7 @@ impl AppInstanceStateGroup {
     }
 
     pub fn set_instance_list(&mut self, instance_list: Vec<Arc<String>>) {
+        self.instance_map.clear();
         for key in instance_list {
             self.add_instance(key);
         }

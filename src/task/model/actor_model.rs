@@ -84,6 +84,7 @@ pub struct RedoTaskItem {
 pub enum TaskManagerReq {
     AddAppInstance(AppKey, Arc<String>),
     AddAppInstances(Vec<AppInstanceKey>),
+    SetAppInstances(AppKey, Vec<Arc<String>>),
     RemoveAppInstance(AppKey, Arc<String>),
     RemoveAppInstances(Vec<AppInstanceKey>),
     TriggerTaskList(Vec<TriggerItem>),

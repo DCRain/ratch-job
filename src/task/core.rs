@@ -80,6 +80,16 @@ impl TaskManager {
         }
     }
 
+    pub fn set_app_instances(&mut self, app_key: AppKey, instance_addrs: Vec<Arc<String>>) {
+        if let Some(app_instance_group) = self.app_instance_group.get_mut(&app_key) {
+            app_instance_group.set_instance_list(instance_addrs);
+        } else {
+            let mut app_instance_group = AppInstanceStateGroup::new(app_key.clone());
+            app_instance_group.set_instance_list(instance_addrs);
+            self.app_instance_group.insert(app_key, app_instance_group);
+        }
+    }
+
     pub fn remove_app_instance(&mut self, app_key: AppKey, instance_addr: Arc<String>) {
         if let Some(app_instance_group) = self.app_instance_group.get_mut(&app_key) {
             app_instance_group.remove_instance(instance_addr);
@@ -505,6 +515,9 @@ impl Handler<TaskManagerReq> for TaskManager {
                 for keys in app_instance_keys {
                     self.add_app_instance(keys.build_app_key(), keys.addr);
                 }
+            }
+            TaskManagerReq::SetAppInstances(app_key, instance_addrs) => {
+                self.set_app_instances(app_key, instance_addrs);
             }
             TaskManagerReq::RemoveAppInstance(app_key, instance_addr) => {
                 self.remove_app_instance(app_key, instance_addr);

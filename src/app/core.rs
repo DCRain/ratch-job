@@ -60,6 +60,7 @@ impl AppManager {
                 app_param.instance_addrs,
                 app_param.last_modified_time,
             );
+            Self::notify_app_key_instances(&self.task_manager, key, app_info);
         } else {
             self.app_index
                 .insert(key.namespace.clone(), key.app_name.clone());
@@ -75,10 +76,27 @@ impl AppManager {
                 app_param.instance_addrs,
                 app_param.last_modified_time,
             );
+            Self::notify_app_key_instances(&self.task_manager, key.clone(), &app_info);
             if let Some(namespace_manager) = self.namespace_manager.as_ref() {
                 namespace_manager.do_send(NamespaceManagerReq::SetWeak(key.namespace.clone()));
             }
             self.app_map.insert(key, app_info);
+        }
+    }
+
+    fn notify_app_key_instances(
+        task_manager: &Option<Addr<TaskManager>>,
+        key: AppKey,
+        app_info: &AppInfo,
+    ) {
+        if app_info.is_auto() {
+            return;
+        }
+        let addrs: Vec<Arc<String>> = app_info.instance_map.keys().cloned().collect();
+        if let Some(task_manager) = task_manager.as_ref() {
+            if !addrs.is_empty() {
+                task_manager.do_send(TaskManagerReq::SetAppInstances(key, addrs));
+            }
         }
     }
 
@@ -221,7 +239,7 @@ impl AppManager {
                 if let Some(instance) = app_info.instance_map.get(&item.app_instance_key.addr) {
                     can_remove = instance.last_modified_time <= timeout_time;
                 }
-                if can_remove {
+                if can_remove && app_info.is_auto() {
                     log::info!(
                         "check_instance_timeout|remove instance:{:?},{}",
                         &app_key,
@@ -383,11 +401,15 @@ impl AppManager {
         let mut namespace_id_set = HashSet::new();
         for (app_key, app_info) in self.app_map.iter() {
             namespace_id_set.insert(app_key.namespace.clone());
-            if !app_info.is_auto() {
-                // 非自动注册的应用，不处理
-                continue;
-            }
             for (instance_key, instance) in app_info.instance_map.iter() {
+                if !app_info.is_auto() {
+                    add_keys.push(AppInstanceKey::new_with_app_key(
+                        app_key.clone(),
+                        instance_key.clone(),
+                    ));
+                    // 非自动注册的应用，不触发超时
+                    continue;
+                }
                 let timeout = instance.last_modified_time;
                 self.app_instance_timeout.add(
                     timeout as u64,
